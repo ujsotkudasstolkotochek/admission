@@ -1,0 +1,28 @@
+{% if programs %}
+<table>
+    <thead>
+        <tr>
+            <th>Направление</th>
+            <th>Программа</th>
+            <th>Бюджетных мест</th>
+            <th>Мин. балл прошедших</th>
+            <th>Средний балл</th>
+            <th>Обновлено</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for program in programs %}
+        <tr>
+            <td>{{ program.name }}</td>
+            <td>{{ program.program_name }}</td>
+            <td>{{ program.budget_places|default:"—" }}</td>
+            <td>{{ program.min_score_passed|default:"—" }}</td>
+            <td>{{ program.avg_score_passed|default:"—" }}</td>
+            <td>{{ program.last_updated|date:"H:i:s" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Нет данных. Добавьте программы через админку.</p>
+{% endif %}

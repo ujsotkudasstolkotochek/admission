@@ -16,7 +16,7 @@ from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     'update-statistics-every-1-min': {
         'task': 'parsers.tasks.update_statistics',
-        'schedule': crontab(minute='*/5'),
+        'schedule': crontab(minute='*/10'),
     },
 }
 # Build paths inside the project like this: BASE_DIR / 'subdir'.

@@ -1,28 +1,86 @@
-{% if programs %}
-<table>
-    <thead>
-        <tr>
-            <th>Направление</th>
-            <th>Программа</th>
-            <th>Бюджетных мест</th>
-            <th>Мин. балл прошедших</th>
-            <th>Средний балл</th>
-            <th>Обновлено</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for program in programs %}
-        <tr>
-            <td>{{ program.name }}</td>
-            <td>{{ program.program_name }}</td>
-            <td>{{ program.budget_places|default:"—" }}</td>
-            <td>{{ program.min_score_passed|default:"—" }}</td>
-            <td>{{ program.avg_score_passed|default:"—" }}</td>
-            <td>{{ program.last_updated|date:"H:i:s" }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<style>
+    .stats-table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 20px;
+        font-family: sans-serif;
+    }
+    .stats-table th, .stats-table td {
+        border: 1px solid #ccc;
+        padding: 8px 12px;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .stats-table th {
+        background-color: #f0f0f0;
+        font-weight: bold;
+    }
+    .stats-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    .place-pass {
+        color: green;
+        font-weight: bold;
+    }
+    .place-fail {
+        color: red;
+        font-weight: bold;
+    }
+    .university-header {
+        margin-top: 30px;
+        font-size: 1.5em;
+        border-bottom: 2px solid #333;
+        padding-bottom: 5px;
+    }
+</style>
+
+{% if universities_data %}
+    {% for uni_name, programs in universities_data.items %}
+        <h3 class="university-header">{{ uni_name }}</h3>
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Направление</th>
+                    <th>Программа</th>
+                    <th>Бюджетных мест</th>
+                    <th>Мин. балл прошедших</th>
+                    <th>Средний балл</th>
+                    <th>Обновлено</th>
+                    {% if show_place %}
+                        <th>Ваше место</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for program in programs %}
+                <tr>
+                    <td>{{ program.name }}</td>
+                    <td>{{ program.program_name }}</td>
+                    <td>{{ program.budget_places|default:"—" }}</td>
+                    <td>{{ program.min_score_passed|default:"—" }}</td>
+                    <td>{{ program.avg_score_passed|default:"—" }}</td>
+                    <td>{{ program.last_updated|date:"d.m.Y H:i:s" }}</td>
+                    {% if show_place %}
+                        <td>
+                            {% if program.user_place %}
+                                {{ program.user_place }} из {{ program.user_total }}
+                                ({% if program.user_place <= program.budget_places %}
+                                    <span class="place-pass">✅ проходите</span>
+                                {% else %}
+                                    <span class="place-fail">❌ не проходите</span>
+                                {% endif %})
+                            {% else %}
+                                Нет данных
+                            {% endif %}
+                        </td>
+                    {% endif %}
+                </tr>
+                {% empty %}
+                <tr><td colspan="7">Нет программ в этом вузе</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
 {% else %}
-<p>Нет данных. Добавьте программы через админку.</p>
+    <p>Нет данных. Добавьте программы через админку.</p>
 {% endif %}

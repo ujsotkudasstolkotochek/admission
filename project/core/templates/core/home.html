@@ -1,47 +1,33 @@
 {% extends 'base.html' %}
-
 {% block content %}
+<h1>Статистика по программам</h1>
 
-{% load static %}
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Шансы на бюджет</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        th { background: #f0f0f0; }
-        .loading { color: #888; }
-    </style>
-</head>
-<body>
-    <h1>Статистика по программам</h1>
-    <div id="data-container">
-        <p class="loading">Загрузка данных...</p>
-    </div>
+{% if user.is_authenticated %}
+    <p>Здравствуйте, {{ user.username }}! Ваши баллы: {{ user.profile.score|default:"не указаны" }}</p>
+    {% if not user.profile.score %}
+        <p><a href="{% url 'users:edit_profile' %}">Укажите свои баллы и статус</a></p>
+    {% endif %}
+{% else %}
+    <p><a href="{% url 'users:login' %}">Войдите</a> или <a href="{% url 'users:register' %}">зарегистрируйтесь</a>, чтобы увидеть своё место.</p>
+{% endif %}
 
-    <script>
-        function refreshData() {
-            fetch('/api/programs-stats/')
-                .then(response => response.text())
-                .then(html => {
-                    document.getElementById('data-container').innerHTML = html;
-                })
-                .catch(err => {
-                    console.error('Ошибка обновления:', err);
-                    document.getElementById('data-container').innerHTML = '<p style="color:red">Ошибка загрузки данных</p>';
-                });
-        }
-        // Обновляем каждые 15 секунд
-        setInterval(refreshData, 15000);
-        // Первая загрузка сразу
-        refreshData();
-    </script>
-</body>
-</html>
+<div id="data-container">
+    <p class="loading">Загрузка данных...</p>
+</div>
 
-
+<script>
+function refreshData() {
+    fetch('/api/programs-stats/')
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('data-container').innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Ошибка обновления:', err);
+            document.getElementById('data-container').innerHTML = '<p style="color:red">Ошибка загрузки данных</p>';
+        });
+}
+setInterval(refreshData, 15000);
+refreshData();
+</script>
 {% endblock %}
-

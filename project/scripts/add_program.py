@@ -170,6 +170,70 @@ programs_to_add = [
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2334",
         "budget_places": 139,  # только общий конкурс (без квот)
     },
+
+    {
+        "university": university_itmo,
+        "code": "2335",
+        "name": "Математическое обеспечение и администрирование информационных систем",
+        "program_name": "Математическое обеспечение и администрирование информационных систем",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2335",
+        "budget_places": 43,  # только общий конкурс (без квот)
+    },
+
+    {
+        "university": university_itmo,
+        "code": "2339",
+        "name": "Информатика и вычислительная техника",
+        "program_name": "Информатика и вычислительная техника",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2339",
+        "budget_places": 16,  # только общий конкурс (без квот)
+    },
+
+    {
+        "university": university_itmo,
+        "code": "2340",
+        "name": "Информационные системы и технологии",
+        "program_name": "Информационные системы и технологии",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2340",
+        "budget_places": 132,  # только общий конкурс (без квот)
+    },
+
+    {
+        "university": university_itmo,
+        "code": "2341",
+        "name": "Прикладная информатика",
+        "program_name": "Прикладная информатика",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2341",
+        "budget_places": 24,  # только общий конкурс (без квот)
+    },
+
+    {
+        "university": university_itmo,
+        "code": "2343",
+        "name": "Информационная безопасность",
+        "program_name": "Информационная безопасность",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2343",
+        "budget_places": 77,  # только общий конкурс (без квот)
+    },
+
+    {
+        "university": university_itmo,
+        "code": "2344",
+        "name": "Инфокоммуникационные технологии и системы связи",
+        "program_name": "Инфокоммуникационные технологии и системы связи",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2344",
+        "budget_places": 73,  # только общий конкурс (без квот)
+    },
+
+    {
+        "university": university_itmo,
+        "code": "2356",
+        "name": "Бизнес-информатика",
+        "program_name": "Бизнес-информатика",
+        "url": "https://abit.itmo.ru/rating/bachelor/budget/2356",
+        "budget_places": 41,  # только общий конкурс (без квот)
+    },
+
 ]
 
 # ============================================================

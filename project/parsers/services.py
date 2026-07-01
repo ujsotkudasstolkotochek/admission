@@ -19,7 +19,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Вспомогательные функции
 # ------------------------------------------------------------
 
-
 def retry_on_connection_error(driver, url, retries=3, delay=5):
     for attempt in range(retries):
         try:
@@ -48,12 +47,9 @@ def sync_applicants(program_obj, applicants_data):
         deleted = Applicant.objects.filter(program=program_obj).delete()[0]
         return {'created': 0, 'updated': 0, 'deleted': deleted}
 
-    # Удаляем всё, что было для этой программы
     deleted = Applicant.objects.filter(program=program_obj).delete()[0]
-
     created = 0
     for data in applicants_data:
-        # Если поле position не передано, ставим None
         position = data.get('position')
         Applicant.objects.create(
             program=program_obj,
@@ -63,13 +59,12 @@ def sync_applicants(program_obj, applicants_data):
             status=data['status'],
         )
         created += 1
-
     return {'created': created, 'updated': 0, 'deleted': deleted}
 
-# ------------------------------------------------------------
-# Парсер для СПбГУ
-# ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Парсер для СПбГУ (увеличен таймаут, добавлено ожидание таблицы)
+# ------------------------------------------------------------
 
 def parse_spbu_program(program_obj):
     kill_chromedrivers()
@@ -102,11 +97,15 @@ def parse_spbu_program(program_obj):
         retry_on_connection_error(driver, program_obj.url)
         time.sleep(5)
 
-        wait = WebDriverWait(driver, 20)
+        wait = WebDriverWait(driver, 30)  # увеличен таймаут
+
+        # Ожидаем появления таблицы
         header = wait.until(EC.presence_of_element_located(
             (By.XPATH, "//th[contains(text(), 'Сумма конкурсных баллов')]")
         ))
         table = header.find_element(By.XPATH, "./ancestor::table")
+        # Ждём, пока в таблице появятся строки (хотя бы одна строка данных)
+        wait.until(EC.presence_of_element_located((By.XPATH, ".//tr[position()>1]")))
         rows = table.find_elements(By.TAG_NAME, 'tr')
         if len(rows) < 2:
             print("⚠️ Таблица пуста")
@@ -176,7 +175,6 @@ def parse_spbu_program(program_obj):
         traceback.print_exc()
     finally:
         driver.quit()
-
         try:
             user_data_dir = driver.capabilities['chrome']['userDataDir']
             if user_data_dir and os.path.exists(user_data_dir):
@@ -188,9 +186,8 @@ def parse_spbu_program(program_obj):
 
 
 # ------------------------------------------------------------
-# Парсер для СПбПУ
+# Парсер для СПбПУ (увеличен таймаут, ожидание строк)
 # ------------------------------------------------------------
-
 
 def parse_spbpu_program(program_obj):
     kill_chromedrivers()
@@ -223,17 +220,22 @@ def parse_spbpu_program(program_obj):
         retry_on_connection_error(driver, "https://my.spbstu.ru/home/abit/list-applicants/bachelor")
         time.sleep(5)
 
-        form = driver.find_element(By.ID, "educationOfForm")
+        wait = WebDriverWait(driver, 30)
+
+        # Выбираем Очную
+        form = wait.until(EC.presence_of_element_located((By.ID, "educationOfForm")))
         Select(form).select_by_visible_text("Очная")
         driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", form)
-        time.sleep(3)
+        time.sleep(2)
 
-        cond = driver.find_element(By.ID, "conditions")
+        # Выбираем Бюджетную основу
+        cond = wait.until(EC.presence_of_element_located((By.ID, "conditions")))
         Select(cond).select_by_visible_text("Бюджетная основа")
         driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", cond)
-        time.sleep(3)
+        time.sleep(2)
 
-        code_select = driver.find_element(By.ID, "code")
+        # Выбираем направление по коду
+        code_select = wait.until(EC.presence_of_element_located((By.ID, "code")))
         found = False
         for option in code_select.find_elements(By.TAG_NAME, "option"):
             if program_obj.code in option.text:
@@ -246,9 +248,18 @@ def parse_spbpu_program(program_obj):
             return
 
         driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", code_select)
-        time.sleep(8)
+        time.sleep(5)
 
-        table = driver.find_element(By.ID, "ajaxTable")
+        # Ждём появления таблицы и строк
+        table = wait.until(EC.presence_of_element_located((By.ID, "ajaxTable")))
+        try:
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ajaxTable tbody tr")))
+        except TimeoutException:
+            time.sleep(5)
+            if not table.find_elements(By.CSS_SELECTOR, "tbody tr"):
+                print("⚠️ Таблица пуста, возможно, направление не активно")
+                return
+
         rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
         print(f"📋 Найдено строк: {len(rows)}")
 
@@ -320,7 +331,6 @@ def parse_spbpu_program(program_obj):
         traceback.print_exc()
     finally:
         driver.quit()
-
         try:
             user_data_dir = driver.capabilities['chrome']['userDataDir']
             if user_data_dir and os.path.exists(user_data_dir):
@@ -332,15 +342,10 @@ def parse_spbpu_program(program_obj):
 
 
 # ------------------------------------------------------------
-# Парсер для ИТМО
+# Парсер для ИТМО (увеличен таймаут, ожидание таблицы)
 # ------------------------------------------------------------
 
-
 def parse_itmo_program(program_obj):
-    """
-    Парсинг рейтинга ИТМО.
-    Сохраняет позицию, код, балл и статус для всех абитуриентов.
-    """
     from .models import Applicant
     import re
     kill_chromedrivers()
@@ -375,12 +380,14 @@ def parse_itmo_program(program_obj):
         time.sleep(5)
 
         wait = WebDriverWait(driver, 30)
+
+        # Ждём появления блока с баллами
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Балл ВИ+ИД')]")))
 
+        # Получаем весь текст страницы
         page_text = driver.find_element(By.TAG_NAME, "body").text
 
         # Разбиваем на блоки абитуриентов
-        # Каждый блок начинается с номера и кода, например "1 №1190457"
         blocks = re.split(r'\n(?=\d+\s+№\d+)', page_text)
         applicants = []
 
@@ -388,21 +395,17 @@ def parse_itmo_program(program_obj):
             if not block.strip():
                 continue
 
-            # Извлекаем номер (позицию)
             pos_match = re.search(r'^(\d+)\s+№\d+', block)
             if not pos_match:
                 continue
             position = int(pos_match.group(1))
 
-            # Извлекаем код
             code_match = re.search(r'№(\d+)', block)
             code = code_match.group(1) if code_match else ''
 
-            # Извлекаем балл ВИ+ИД
             score_match = re.search(r'Балл ВИ\+ИД:\s*(\d+)', block)
             score = float(score_match.group(1)) if score_match else 0.0
 
-            # Определяем статус
             raw_lower = block.lower()
             if 'олимпиада' in raw_lower or 'без вступительных' in raw_lower or 'бви' in raw_lower:
                 status = 'no_exam'
@@ -426,10 +429,8 @@ def parse_itmo_program(program_obj):
             print("⚠️ Данные не найдены")
             return
 
-        # Синхронизация с БД
         stats = sync_applicants(program_obj, applicants)
 
-        # Обновляем статистику программы (только по общему конкурсу)
         common_scores = [app['score'] for app in applicants if app['status'] == 'common' and app['score'] > 0]
         if common_scores:
             common_scores.sort(reverse=True)
@@ -454,7 +455,6 @@ def parse_itmo_program(program_obj):
         traceback.print_exc()
     finally:
         driver.quit()
-
         try:
             user_data_dir = driver.capabilities['chrome']['userDataDir']
             if user_data_dir and os.path.exists(user_data_dir):
@@ -468,7 +468,6 @@ def parse_itmo_program(program_obj):
 # ------------------------------------------------------------
 # Обновление всех программ
 # ------------------------------------------------------------
-
 
 def update_all_programs():
     print("🔄 Начинаем обновление данных...")
@@ -496,7 +495,6 @@ def update_all_programs():
 # ------------------------------------------------------------
 # Тестовая функция для СПбПУ (можно запускать для отладки)
 # ------------------------------------------------------------
-
 
 def test_spbpu():
     options = Options()
@@ -585,7 +583,6 @@ def test_spbpu():
 # Тестовая функция для ИТМО (вывод данных в консоль)
 # ------------------------------------------------------------
 
-
 def test_itmo(code='2334'):
     """
     Тестовый парсинг рейтинга ИТМО для заданного направления.
@@ -601,7 +598,6 @@ def test_itmo(code='2334'):
     import time
     import re
 
-    # Убиваем старые chromedriver
     try:
         import subprocess
         subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'],
@@ -639,16 +635,13 @@ def test_itmo(code='2334'):
         print(f"⏳ Открываем страницу ИТМО: {url}")
         driver.get(url)
 
-        # Даём странице время на первоначальную загрузку
         time.sleep(5)
 
-        # Проверяем, есть ли на странице какой-то текст
         body_text = driver.find_element(By.TAG_NAME, "body").text
         if "404" in body_text or "не найдена" in body_text:
             print("⚠️ Страница не найдена (404). Проверьте код направления.")
             return
 
-        # Ждём появления любого элемента, содержащего "Балл" или "Есть согласие"
         wait = WebDriverWait(driver, 30)
         try:
             wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Балл ВИ+ИД')]")))
@@ -663,12 +656,10 @@ def test_itmo(code='2334'):
                 print(driver.page_source[:3000])
                 return
 
-        # Получаем весь текст страницы
         page_text = driver.find_element(By.TAG_NAME, "body").text
         print("\n📋 Первые 500 символов страницы (для понимания структуры):")
         print(page_text[:500])
 
-        # Парсим строки с абитуриентами
         lines = page_text.split('\n')
         applicants = []
         current = {}
@@ -679,7 +670,6 @@ def test_itmo(code='2334'):
             if not line:
                 continue
 
-            # Если строка начинается с номера и кода (например, "1 №1190457")
             if re.match(r'^\d+\s+№\d+', line):
                 if current:
                     applicants.append(current)
@@ -701,7 +691,6 @@ def test_itmo(code='2334'):
             print("⚠️ Абитуриенты не найдены. Возможно, страница пуста или структура отличается.")
             return
 
-        # Выводим первые 10 записей
         print("\n📋 Первые 10 записей:")
         for i, app in enumerate(applicants[:10]):
             raw = app.get('raw', '')
@@ -716,7 +705,6 @@ def test_itmo(code='2334'):
 
             print(f"  {i+1}. Код: {code}, Баллы: {score}, Согласие: {consent}, Статус: {status}")
 
-        # Информация о направлении
         match = re.search(r'Количество мест:\s*(\d+)', page_text)
         if match:
             print(f"\n📊 Количество бюджетных мест: {match.group(1)}")
@@ -725,7 +713,6 @@ def test_itmo(code='2334'):
         print(f"❌ Ошибка: {e}")
         import traceback
         traceback.print_exc()
-        # Выводим HTML при ошибке
         try:
             print("\n📄 HTML страницы (первые 2000 символов):")
             print(driver.page_source[:2000])

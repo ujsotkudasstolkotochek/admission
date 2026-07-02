@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e  # останавливаемся при любой ошибке
+set -e  # остановка при любой ошибке
 
 echo "🚀 Устанавливаем зависимости..."
 pip install -r requirements.txt
@@ -11,8 +11,16 @@ echo "🗄️ Применяем миграции (создаём, если ну
 python project/manage.py makemigrations
 python project/manage.py migrate   # теперь только один раз
 
-echo "📋 Загружаем / обновляем программы..."
-python project/manage.py add_programs
-python project/manage.py update_all_programs
+echo "📋 Добавляем программы из скрипта..."
+python scripts/add_program.py      # запускаем скрипт добавления
+
+echo "🔄 Обновляем все программы через сервис..."
+python -c "
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+django.setup()
+from parsers.services import update_all_programs
+update_all_programs()
+"
 
 echo "✅ Сборка завершена!"

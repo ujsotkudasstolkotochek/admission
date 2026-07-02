@@ -1,16 +1,11 @@
-# parsers/apps.py
 from django.apps import AppConfig
-import os
+from django.db.models.signals import post_migrate
 
 class ParsersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'parsers'
 
     def ready(self):
-        USE_CELERY = os.environ.get('USE_CELERY', 'False') == 'True'
-        if not USE_CELERY:
-            print(1)
-            from .scheduler import start_scheduler
-            start_scheduler()
-        else:
-            print("⏩ Используется Celery, планировщик APScheduler не запущен")
+        from .scheduler import start_scheduler
+        # Запускаем планировщик после завершения всех миграций
+        post_migrate.connect(start_scheduler, sender=self)

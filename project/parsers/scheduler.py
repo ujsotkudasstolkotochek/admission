@@ -1,5 +1,4 @@
 import os
-import time
 import fcntl
 from apscheduler.schedulers.background import BackgroundScheduler
 from django_apscheduler.jobstores import DjangoJobStore
@@ -9,6 +8,8 @@ scheduler = BackgroundScheduler()
 
 LOCK_FILE = "/tmp/apscheduler.lock"
 lock_handle = None
+
+_scheduler_started = False
 
 
 def acquire_lock():
@@ -30,7 +31,6 @@ def job():
     except Exception as e:
         print("❌ Scheduler error:", e)
 
-_scheduler_started = False
 
 def start_scheduler():
     global _scheduler_started
@@ -43,11 +43,14 @@ def start_scheduler():
         print("⏹ Scheduler already running in another process")
         return
 
+    if scheduler.running:
+        return
+
     scheduler.add_jobstore(DjangoJobStore(), "default")
 
     scheduler.add_job(
         job,
-        "interval",
+        trigger="interval",
         minutes=10,
         id="update_programs_job",
         replace_existing=True,

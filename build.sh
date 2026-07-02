@@ -8,17 +8,19 @@ echo "📦 Собираем статику..."
 python project/manage.py collectstatic --noinput
 
 echo "🗄️ Пробуем применить миграции (основной путь)..."
-python manage.py migrate --fake-initial || true
-python manage.py migrate --fake parsers || true
-python manage.py migrate
+python project/manage.py migrate --noinput || {
+    echo "⚠️ Обычная миграция упала. Пробуем --fake-initial..."
+    python project/manage.py migrate --fake-initial --noinput || {
+        echo "⚠️ Пробуем fake для parsers..."
+        python project/manage.py migrate parsers --fake || true
+        python project/manage.py migrate --noinput
+    }
+}
 
-echo "🧠 Проверяем/создаём новые миграции (безопасно)..."
-python project/manage.py makemigrations --noinput || true
-
-echo "📋 Добавляем программы из скрипта..."
+echo "📋 Добавляем программы..."
 python project/scripts/add_program.py
 
-echo "🔄 Обновляем все программы через сервис..."
+echo "🔄 Обновляем данные..."
 python - << 'EOF'
 import os
 import django
@@ -30,4 +32,4 @@ from parsers.services import update_all_programs
 update_all_programs()
 EOF
 
-echo "✅ Сборка завершена!"
+echo "✅ Готово!"

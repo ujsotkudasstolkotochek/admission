@@ -19,7 +19,7 @@ python -c "
 import os, django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
-from project.parsers.services import update_all_programs   # ← исправленный импорт
+from parsers.services import update_all_programs   # ← исправленный импорт
 update_all_programs()
 "
 

@@ -241,6 +241,15 @@ programs_to_add = [
 # ============================================================
 
 for prog_data in programs_to_add:
+    print("=" * 60)
+    for k, v in prog_data.items():
+        if isinstance(v, str):
+            print(f"{k}: {len(v)}")
+            if len(v) > 200:
+                print("СЛИШКОМ ДЛИННОЕ ПОЛЕ!")
+                print(v)
+    print("=" * 60)
+
     obj, created = Program.objects.get_or_create(
         university=prog_data["university"],
         code=prog_data["code"],
@@ -251,7 +260,3 @@ for prog_data in programs_to_add:
             "budget_places": prog_data["budget_places"],
         }
     )
-    if created:
-        print(f"✅ Добавлена программа: {obj}")
-    else:
-        print(f"ℹ️ Программа уже существует: {obj}")

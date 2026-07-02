@@ -63,7 +63,7 @@ def sync_applicants(program_obj, applicants_data):
 
 
 # ------------------------------------------------------------
-# Парсер для СПбГУ (увеличен таймаут, добавлено ожидание таблицы)
+# Парсер для СПбГУ (исправлена статистика)
 # ------------------------------------------------------------
 
 def parse_spbu_program(program_obj):
@@ -97,21 +97,19 @@ def parse_spbu_program(program_obj):
         retry_on_connection_error(driver, program_obj.url)
         time.sleep(5)
 
-        wait = WebDriverWait(driver, 30)  # увеличен таймаут
+        wait = WebDriverWait(driver, 30)
 
-        # Ожидаем появления таблицы
         header = wait.until(EC.presence_of_element_located(
             (By.XPATH, "//th[contains(text(), 'Сумма конкурсных баллов')]")
         ))
         table = header.find_element(By.XPATH, "./ancestor::table")
-        # Ждём, пока в таблице появятся строки (хотя бы одна строка данных)
         wait.until(EC.presence_of_element_located((By.XPATH, ".//tr[position()>1]")))
         rows = table.find_elements(By.TAG_NAME, 'tr')
         if len(rows) < 2:
             print("⚠️ Таблица пуста")
             return
 
-        scores = []
+        common_scores = []
         applicants_data = []
         for row in rows[1:]:
             cols = row.find_elements(By.TAG_NAME, 'td')
@@ -145,7 +143,8 @@ def parse_spbu_program(program_obj):
                     'score': score,
                     'status': status,
                 })
-                scores.append(score)
+                if status == 'common' and score > 0:
+                    common_scores.append(score)
 
         if not applicants_data:
             print("⚠️ Данные не найдены")
@@ -153,10 +152,10 @@ def parse_spbu_program(program_obj):
 
         stats = sync_applicants(program_obj, applicants_data)
 
-        scores.sort(reverse=True)
+        common_scores.sort(reverse=True)
         budget = program_obj.budget_places or 0
-        if budget > 0:
-            passed_scores = scores[:budget]
+        if budget > 0 and common_scores:
+            passed_scores = common_scores[:budget]
             if passed_scores:
                 program_obj.min_score_passed = min(passed_scores)
                 program_obj.avg_score_passed = round(sum(passed_scores) / len(passed_scores), 2)
@@ -186,7 +185,7 @@ def parse_spbu_program(program_obj):
 
 
 # ------------------------------------------------------------
-# Парсер для СПбПУ (увеличен таймаут, ожидание строк)
+# Парсер для СПбПУ (исправлена статистика, добавлена "Отдельная квота")
 # ------------------------------------------------------------
 
 def parse_spbpu_program(program_obj):
@@ -222,19 +221,16 @@ def parse_spbpu_program(program_obj):
 
         wait = WebDriverWait(driver, 30)
 
-        # Выбираем Очную
         form = wait.until(EC.presence_of_element_located((By.ID, "educationOfForm")))
         Select(form).select_by_visible_text("Очная")
         driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", form)
         time.sleep(2)
 
-        # Выбираем Бюджетную основу
         cond = wait.until(EC.presence_of_element_located((By.ID, "conditions")))
         Select(cond).select_by_visible_text("Бюджетная основа")
         driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", cond)
         time.sleep(2)
 
-        # Выбираем направление по коду
         code_select = wait.until(EC.presence_of_element_located((By.ID, "code")))
         found = False
         for option in code_select.find_elements(By.TAG_NAME, "option"):
@@ -250,7 +246,6 @@ def parse_spbpu_program(program_obj):
         driver.execute_script("arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", code_select)
         time.sleep(5)
 
-        # Ждём появления таблицы и строк
         table = wait.until(EC.presence_of_element_located((By.ID, "ajaxTable")))
         try:
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ajaxTable tbody tr")))
@@ -267,7 +262,7 @@ def parse_spbpu_program(program_obj):
             print("⚠️ Таблица пуста")
             return
 
-        scores = []
+        common_scores = []
         applicants_data = []
         for row in rows:
             cols = row.find_elements(By.TAG_NAME, "td")
@@ -290,6 +285,8 @@ def parse_spbpu_program(program_obj):
                     status = 'target'
                 elif 'Особая квота' in status_text:
                     status = 'special'
+                elif 'Отдельная квота' in status_text:   # добавлено
+                    status = 'special'
                 elif status_text == 'Нет':
                     status = 'common'
                 else:
@@ -301,7 +298,8 @@ def parse_spbpu_program(program_obj):
                     'score': score,
                     'status': status,
                 })
-                scores.append(score)
+                if status == 'common' and score > 0:
+                    common_scores.append(score)
 
         if not applicants_data:
             print("⚠️ Данные не найдены")
@@ -309,10 +307,10 @@ def parse_spbpu_program(program_obj):
 
         stats = sync_applicants(program_obj, applicants_data)
 
-        scores.sort(reverse=True)
+        common_scores.sort(reverse=True)
         budget = program_obj.budget_places or 0
-        if budget > 0:
-            passed_scores = scores[:budget]
+        if budget > 0 and common_scores:
+            passed_scores = common_scores[:budget]
             if passed_scores:
                 program_obj.min_score_passed = min(passed_scores)
                 program_obj.avg_score_passed = round(sum(passed_scores) / len(passed_scores), 2)
@@ -342,7 +340,7 @@ def parse_spbpu_program(program_obj):
 
 
 # ------------------------------------------------------------
-# Парсер для ИТМО (увеличен таймаут, ожидание таблицы)
+# Парсер для ИТМО (уже использует common_scores, оставляем как есть)
 # ------------------------------------------------------------
 
 def parse_itmo_program(program_obj):
@@ -381,13 +379,10 @@ def parse_itmo_program(program_obj):
 
         wait = WebDriverWait(driver, 30)
 
-        # Ждём появления блока с баллами
         wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'Балл ВИ+ИД')]")))
 
-        # Получаем весь текст страницы
         page_text = driver.find_element(By.TAG_NAME, "body").text
 
-        # Разбиваем на блоки абитуриентов
         blocks = re.split(r'\n(?=\d+\s+№\d+)', page_text)
         applicants = []
 
@@ -493,7 +488,7 @@ def update_all_programs():
 
 
 # ------------------------------------------------------------
-# Тестовая функция для СПбПУ (можно запускать для отладки)
+# Тестовые функции (без изменений)
 # ------------------------------------------------------------
 
 def test_spbpu():
@@ -578,10 +573,6 @@ def test_spbpu():
         driver.quit()
         print("\n✅ Тест завершён")
 
-
-# ------------------------------------------------------------
-# Тестовая функция для ИТМО (вывод данных в консоль)
-# ------------------------------------------------------------
 
 def test_itmo(code='2334'):
     """

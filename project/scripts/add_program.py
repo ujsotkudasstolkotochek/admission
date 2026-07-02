@@ -253,9 +253,9 @@ for prog_data in programs_to_add:
     obj, created = Program.objects.get_or_create(
         university=prog_data["university"],
         code=prog_data["code"],
-        name=prog_data["name"],
+        name=prog_data["name"][:200],
         defaults={
-            "program_name": prog_data["program_name"],
+            "program_name": prog_data["program_name"][:500],
             "url": prog_data["url"],
             "budget_places": prog_data["budget_places"],
         }

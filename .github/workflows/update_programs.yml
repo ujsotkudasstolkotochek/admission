@@ -23,7 +23,7 @@ jobs:
 
       - name: Run update
         working-directory: .
-        run: python project/manage.py update_programs
+        run: python -u project/manage.py update_programs
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}

@@ -240,6 +240,11 @@ programs_to_add = [
 # Загрузка программ в БД
 # ============================================================
 
+def safe(v, limit=5000):
+    if not v:
+        return ""
+    return str(v)[:limit]
+
 for prog_data in programs_to_add:
     print("=" * 60)
     for k, v in prog_data.items():
@@ -253,9 +258,9 @@ for prog_data in programs_to_add:
     obj, created = Program.objects.get_or_create(
         university=prog_data["university"],
         code=prog_data["code"],
-        name=prog_data["name"][:200],
+        name=safe(prog_data["name"]),
         defaults={
-            "program_name": prog_data["program_name"][:500],
+            "program_name": safe(prog_data["program_name"]),
             "url": prog_data["url"],
             "budget_places": prog_data["budget_places"],
         }

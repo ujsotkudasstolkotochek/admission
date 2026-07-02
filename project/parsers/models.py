@@ -8,16 +8,19 @@ class University(models.Model):
         return self.name
 
 class Program(models.Model):
-    university = models.ForeignKey(University, on_delete=models.CASCADE, related_name='programs')
-    name = models.CharField(max_length=500)
-    code = models.CharField(max_length=50)
+    university = models.ForeignKey("University", on_delete=models.CASCADE, related_name="programs")
+
+    name = models.TextField()
     program_name = models.TextField()
-    url = models.URLField()
-    budget_places = models.PositiveIntegerField(null=True, blank=True)
+    url = models.TextField()
+
+    code = models.CharField(max_length=100)
+
+    budget_places = models.IntegerField(null=True, blank=True)
     min_score_passed = models.FloatField(null=True, blank=True)
     avg_score_passed = models.FloatField(null=True, blank=True)
-    last_updated = models.DateTimeField(auto_now=True)
 
+    last_updated = models.DateTimeField(auto_now=True)
     def __str__(self):
         return f"{self.code} {self.name} – {self.program_name}"
 

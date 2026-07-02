@@ -1,0 +1,11 @@
+django
+gunicorn
+psycopg2-binary
+dj-database-url
+whitenoise
+selenium
+webdriver-manager
+celery
+redis
+django-celery-beat
+django-apscheduler

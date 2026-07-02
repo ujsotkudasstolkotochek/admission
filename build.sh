@@ -5,9 +5,9 @@ echo "🚀 Устанавливаем зависимости..."
 pip install -r requirements.txt
 
 echo "📦 Собираем статику..."
-python manage.py collectstatic --noinput
+python project/manage.py collectstatic --noinput
 
 echo "🗄️ Применяем миграции..."
-python manage.py migrate
+python project/manage.py migrate
 
 echo "✅ Сборка завершена!"

@@ -30,20 +30,24 @@ def job():
     except Exception as e:
         print("❌ Scheduler error:", e)
 
+_scheduler_started = False
 
 def start_scheduler():
+    global _scheduler_started
+
+    if _scheduler_started:
+        return
+    _scheduler_started = True
+
     if not acquire_lock():
         print("⏹ Scheduler already running in another process")
-        return
-
-    if scheduler.running:
         return
 
     scheduler.add_jobstore(DjangoJobStore(), "default")
 
     scheduler.add_job(
         job,
-        trigger="interval",
+        "interval",
         minutes=10,
         id="update_programs_job",
         replace_existing=True,

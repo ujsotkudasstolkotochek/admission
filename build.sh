@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e  # остановка при любой ошибке
+set -e
 
 echo "🚀 Устанавливаем зависимости..."
 pip install -r requirements.txt
@@ -7,20 +7,27 @@ pip install -r requirements.txt
 echo "📦 Собираем статику..."
 python project/manage.py collectstatic --noinput
 
-echo "🗄️ Применяем миграции (создаём, если нужно)..."
-python project/manage.py makemigrations
-python project/manage.py migrate
+echo "🗄️ Пробуем применить миграции (основной путь)..."
+python manage.py migrate --fake-initial || true
+python manage.py migrate --fake parsers || true
+python manage.py migrate
+
+echo "🧠 Проверяем/создаём новые миграции (безопасно)..."
+python project/manage.py makemigrations --noinput || true
 
 echo "📋 Добавляем программы из скрипта..."
-python project/scripts/add_program.py   # ← исправленный путь
+python project/scripts/add_program.py
 
 echo "🔄 Обновляем все программы через сервис..."
-python -c "
-import os, django
+python - << 'EOF'
+import os
+import django
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
-from parsers.services import update_all_programs   # ← исправленный импорт
+
+from parsers.services import update_all_programs
 update_all_programs()
-"
+EOF
 
 echo "✅ Сборка завершена!"

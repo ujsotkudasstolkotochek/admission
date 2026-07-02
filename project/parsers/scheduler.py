@@ -3,21 +3,36 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from django_apscheduler.jobstores import DjangoJobStore
 from .services import update_all_programs
 
-SCHEDULER_ENABLED = os.environ.get('SCHEDULER_ENABLED', 'True') == 'True'
+scheduler = BackgroundScheduler()
 
-def start_scheduler(**kwargs):
-    if not SCHEDULER_ENABLED:
-        print("⏹ Планировщик отключён через переменную окружения")
+def job():
+    try:
+        update_all_programs()
+        print("✅ Programs updated")
+    except Exception as e:
+        print("❌ Scheduler error:", e)
+
+
+def start_scheduler():
+    if os.environ.get("SCHEDULER_ENABLED", "true").lower() != "true":
+        print("⏹ Scheduler disabled")
         return
 
-    scheduler = BackgroundScheduler()
-    scheduler.add_jobstore(DjangoJobStore(), 'default')
+    # защита от повторного старта
+    if scheduler.running:
+        return
+
+    scheduler.add_jobstore(DjangoJobStore(), "default")
+
     scheduler.add_job(
-        update_all_programs,
-        'interval',
+        job,
+        trigger="interval",
         minutes=10,
-        id='update_stats',
+        id="update_programs_job",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
+
     scheduler.start()
-    print("✅ Планировщик APScheduler запущен (задача каждые 10 минут)")
+    print("🚀 APScheduler started")

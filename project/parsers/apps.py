@@ -1,11 +1,14 @@
 from django.apps import AppConfig
-from django.db.models.signals import post_migrate
+import os
 
 class ParsersConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'parsers'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "parsers"
 
     def ready(self):
+        # защита от двойного запуска Django
+        if os.environ.get("RUN_MAIN") != "true":
+            return
+
         from .scheduler import start_scheduler
-        # Запускаем планировщик после завершения всех миграций
-        post_migrate.connect(start_scheduler, sender=self)
+        start_scheduler()

@@ -1,4 +1,4 @@
-# dop/add_program.py
+# project/scripts/add_programs.py
 import os
 import sys
 from pathlib import Path
@@ -29,6 +29,11 @@ university_spbstu, _ = University.objects.get_or_create(
 university_itmo, _ = University.objects.get_or_create(
     name="Национальный исследовательский университет ИТМО",
     defaults={"short_name": "ИТМО"}
+)
+
+university_mirea, _ = University.objects.get_or_create(
+    name="МИРЭА - Российский технологический университет",
+    defaults={"short_name": "МИРЭА"}
 )
 
 # ============================================================
@@ -168,70 +173,172 @@ programs_to_add = [
         "name": "Прикладная математика и информатика",
         "program_name": "Прикладная математика и информатика",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2334",
-        "budget_places": 139,  # только общий конкурс (без квот)
+        "budget_places": 139,
     },
-
     {
         "university": university_itmo,
         "code": "2335",
         "name": "Математическое обеспечение и администрирование информационных систем",
         "program_name": "Математическое обеспечение и администрирование информационных систем",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2335",
-        "budget_places": 43,  # только общий конкурс (без квот)
+        "budget_places": 43,
     },
-
     {
         "university": university_itmo,
         "code": "2339",
         "name": "Информатика и вычислительная техника",
         "program_name": "Информатика и вычислительная техника",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2339",
-        "budget_places": 16,  # только общий конкурс (без квот)
+        "budget_places": 16,
     },
-
     {
         "university": university_itmo,
         "code": "2340",
         "name": "Информационные системы и технологии",
         "program_name": "Информационные системы и технологии",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2340",
-        "budget_places": 132,  # только общий конкурс (без квот)
+        "budget_places": 132,
     },
-
     {
         "university": university_itmo,
         "code": "2341",
         "name": "Прикладная информатика",
         "program_name": "Прикладная информатика",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2341",
-        "budget_places": 24,  # только общий конкурс (без квот)
+        "budget_places": 24,
     },
-
     {
         "university": university_itmo,
         "code": "2343",
         "name": "Информационная безопасность",
         "program_name": "Информационная безопасность",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2343",
-        "budget_places": 77,  # только общий конкурс (без квот)
+        "budget_places": 77,
     },
-
     {
         "university": university_itmo,
         "code": "2344",
         "name": "Инфокоммуникационные технологии и системы связи",
         "program_name": "Инфокоммуникационные технологии и системы связи",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2344",
-        "budget_places": 73,  # только общий конкурс (без квот)
+        "budget_places": 73,
     },
-
     {
         "university": university_itmo,
         "code": "2356",
         "name": "Бизнес-информатика",
         "program_name": "Бизнес-информатика",
         "url": "https://abit.itmo.ru/rating/bachelor/budget/2356",
-        "budget_places": 41,  # только общий конкурс (без квот)
+        "budget_places": 41,
+    },
+
+    # ---------- МИРЭА ----------
+    {
+        "university": university_mirea,
+        "code": "1862638569831537974",
+        "name": "Системное программирование и компьютерные технологии",
+        "program_name": "Системное программирование и компьютерные технологии",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638569831537974&edu_level=2&org_unit_id=14840287700495285107&edu_form_id=1",
+        "budget_places": 19,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862532990899330358",
+        "name": "Анализ данных",
+        "program_name": "Анализ данных",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862532990899330358&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 21,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638576237288758",
+        "name": "Бизнес-аналитика",
+        "program_name": "Бизнес-аналитика",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638576237288758&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 18,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638630198058294",
+        "name": "Инфраструктура информационных технологий",
+        "program_name": "Инфраструктура информационных технологий",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638630198058294&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 27,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862533213266648374",
+        "name": "Технологии разработки платформенных бизнес-приложений",
+        "program_name": "Технологии разработки платформенных бизнес-приложений",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862533213266648374&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 40,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638696623250742",
+        "name": "Разработка кроссплатформенных бизнес-приложений",
+        "program_name": "Разработка кроссплатформенных бизнес-приложений",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638696623250742&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 46,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638703059410230",
+        "name": "Технологии искусственного интеллекта и анализ данных",
+        "program_name": "Технологии искусственного интеллекта и анализ данных",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638703059410230&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 50,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638710286196022",
+        "name": "Технологии разработки программного обеспечения полного цикла",
+        "program_name": "Технологии разработки программного обеспечения полного цикла",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638710286196022&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 33,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638731367816502",
+        "name": "Управление данными",
+        "program_name": "Управление данными",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638731367816502&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 28,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638745412443446",
+        "name": "Интеллектуальные системы поддержки принятия решений",
+        "program_name": "Интеллектуальные системы поддержки принятия решений",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638745412443446&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 25,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638830212881718",
+        "name": "Аудиовизуальные системы и технологии медиасвязи",
+        "program_name": "Аудиовизуальные системы и технологии медиасвязи",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638830212881718&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 33,
+    },
+
+    {
+        "university": university_mirea,
+        "code": "1862638837220515126",
+        "name": "Инфокоммуникационные системы и сети",
+        "program_name": "Инфокоммуникационные системы и сети",
+        "url": "https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids=1862638837220515126&edu_level=2&org_unit_id=1484028700495285107&edu_form_id=1",
+        "budget_places": 48,
     },
 
 ]
@@ -245,16 +352,11 @@ def safe(v, limit=5000):
         return ""
     return str(v)[:limit]
 
-for prog_data in programs_to_add:
-    print("=" * 60)
-    for k, v in prog_data.items():
-        if isinstance(v, str):
-            print(f"{k}: {len(v)}")
-            if len(v) > 200:
-                print("СЛИШКОМ ДЛИННОЕ ПОЛЕ!")
-                print(v)
-    print("=" * 60)
+added = 0
+updated = 0
+unchanged = 0
 
+for prog_data in programs_to_add:
     obj, created = Program.objects.get_or_create(
         university=prog_data["university"],
         code=prog_data["code"],
@@ -265,3 +367,28 @@ for prog_data in programs_to_add:
             "budget_places": prog_data["budget_places"],
         }
     )
+    if created:
+        print(f"✅ Добавлена программа: {prog_data['code']} - {prog_data['name']}")
+        added += 1
+    else:
+        # Проверяем, изменились ли данные
+        changed = False
+        if obj.program_name != prog_data["program_name"]:
+            obj.program_name = prog_data["program_name"]
+            changed = True
+        if obj.url != prog_data["url"]:
+            obj.url = prog_data["url"]
+            changed = True
+        if obj.budget_places != prog_data["budget_places"]:
+            obj.budget_places = prog_data["budget_places"]
+            changed = True
+        if changed:
+            obj.save()
+            print(f"🔄 Обновлена программа: {prog_data['code']} - {prog_data['name']}")
+            updated += 1
+        else:
+            print(f"⏩ Без изменений: {prog_data['code']} - {prog_data['name']}")
+            unchanged += 1
+
+print("=" * 60)
+print(f"Итог: добавлено {added}, обновлено {updated}, без изменений {unchanged}.")

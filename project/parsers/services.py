@@ -33,6 +33,14 @@ def retry_on_connection_error(driver, url, retries=3, delay=5):
 def kill_chromedrivers():
     try:
         subprocess.run(
+            ['wmic', 'process', 'where',
+             "name='chrome.exe' and commandline like '%--headless%'",
+             'delete'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False
+        )
+        subprocess.run(
             ['taskkill', '/f', '/im', 'chromedriver.exe'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -40,7 +48,6 @@ def kill_chromedrivers():
         )
     except Exception:
         pass
-
 def sync_applicants(program_obj, applicants_data):
     """Полностью пересоздаёт записи для программы (удаляет старые, создаёт новые)."""
     if not applicants_data:
@@ -182,6 +189,7 @@ def parse_spbu_program(program_obj):
                 print("🧹 Временный профиль Chrome удалён")
         except Exception as e:
             print(f"⚠️ Не удалось удалить временный профиль: {e}")
+        kill_chromedrivers()
 
 
 # ------------------------------------------------------------
@@ -337,6 +345,7 @@ def parse_spbpu_program(program_obj):
                 print("🧹 Временный профиль Chrome удалён")
         except Exception as e:
             print(f"⚠️ Не удалось удалить временный профиль: {e}")
+        kill_chromedrivers()
 
 
 # ------------------------------------------------------------
@@ -458,6 +467,162 @@ def parse_itmo_program(program_obj):
                 print("🧹 Временный профиль Chrome удалён")
         except Exception as e:
             print(f"⚠️ Не удалось удалить временный профиль: {e}")
+        kill_chromedrivers()
+
+
+# ------------------------------------------------------------
+# Парсер для МИРЭА
+# ------------------------------------------------------------
+
+def parse_mirea_program(program_obj):
+    kill_chromedrivers()
+
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-logging")
+    options.add_argument("--silent")
+    options.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/138.0.0.0 Safari/537.36"
+    )
+
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
+
+    try:
+        print(f"⏳ Парсинг МИРЭА: {program_obj.code} {program_obj.name}")
+        retry_on_connection_error(driver, program_obj.url)
+        time.sleep(5)
+
+        wait = WebDriverWait(driver, 30)
+
+        # Ждём появления таблицы
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table tbody tr")))
+        print("✅ Таблица найдена.")
+
+        # Находим таблицу с данными (первую попавшуюся с данными)
+        tables = driver.find_elements(By.TAG_NAME, "table")
+        target_table = None
+        for table in tables:
+            rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
+            if rows:
+                target_table = table
+                break
+
+        if not target_table:
+            print("⚠️ Таблица с данными не найдена")
+            return
+
+        rows = target_table.find_elements(By.CSS_SELECTOR, "tbody tr")
+        print(f"📋 Найдено строк: {len(rows)}")
+
+        if not rows:
+            print("⚠️ Таблица пуста")
+            return
+
+        # Парсим строки
+        common_scores = []
+        applicants_data = []
+
+        for row in rows:
+            cols = row.find_elements(By.TAG_NAME, "td")
+            if len(cols) < 9:  # минимальное количество колонок, которое нам нужно
+                continue
+
+            try:
+                position = int(cols[0].text.strip()) if cols[0].text.strip() else None
+                code = cols[1].text.strip() if len(cols) > 1 else ''
+
+                # Статус определяется по колонкам:
+                # - колонка 4 (индекс 4) - "да" если есть согласие
+                # - колонка 7 (индекс 7) - три балла ЕГЭ через пробел
+                # - колонка 8 (индекс 8) - сумма баллов за ИД
+                # - колонка 9 (индекс 9) - баллы за индивидуальные достижения
+                # - колонка 10 (индекс 10) - общая сумма баллов
+
+                # Проверяем, есть ли отметка "да" в колонке согласия (индекс 4)
+                consent = cols[4].text.strip().lower() if len(cols) > 4 else ''
+
+                # Статус абитуриента
+                # По умолчанию считаем, что все участвуют в общем конкурсе
+                # Особые статусы определяем по дополнительным признакам
+                status = 'common'
+
+                # Если есть отметка о целевом или особой квоте - нужно определить
+                # Пока оставляем как common, т.к. в таблице нет явных признаков
+                # Но можно добавить логику позже, если появятся данные
+
+                # Сумма баллов - обычно в колонке 10 (индекс 10)
+                score_str = cols[10].text.strip().replace(',', '.') if len(cols) > 10 else '0'
+                try:
+                    score = float(score_str) if score_str else 0.0
+                except ValueError:
+                    score = 0.0
+
+                applicants_data.append({
+                    'position': position,
+                    'code': code,
+                    'score': score,
+                    'status': status,
+                })
+
+                if status == 'common' and score > 0:
+                    common_scores.append(score)
+
+            except Exception as e:
+                print(f"⚠️ Ошибка при парсинге строки: {e}")
+                continue
+
+        if not applicants_data:
+            print("⚠️ Данные не найдены")
+            return
+
+        stats = sync_applicants(program_obj, applicants_data)
+
+        # Вычисляем проходные баллы
+        common_scores.sort(reverse=True)
+        budget = program_obj.budget_places or 0
+        if budget > 0 and common_scores:
+            passed_scores = common_scores[:budget]
+            if passed_scores:
+                program_obj.min_score_passed = min(passed_scores)
+                program_obj.avg_score_passed = round(sum(passed_scores) / len(passed_scores), 2)
+            else:
+                program_obj.min_score_passed = None
+                program_obj.avg_score_passed = None
+        else:
+            program_obj.min_score_passed = None
+            program_obj.avg_score_passed = None
+        program_obj.save()
+
+        print(
+            f"✅ Обновлена программа {program_obj.code}: создано {stats['created']}, обновлено {stats['updated']}, удалено {stats['deleted']}")
+
+    except Exception as e:
+        print(f"❌ Ошибка при парсинге МИРЭА: {e}")
+        traceback.print_exc()
+    finally:
+        driver.quit()
+        try:
+            user_data_dir = driver.capabilities['chrome']['userDataDir']
+            if user_data_dir and os.path.exists(user_data_dir):
+                import shutil
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+                print("🧹 Временный профиль Chrome удалён")
+        except Exception as e:
+            print(f"⚠️ Не удалось удалить временный профиль: {e}")
+        kill_chromedrivers()
 
 
 # ------------------------------------------------------------
@@ -479,13 +644,14 @@ def update_all_programs():
                 parse_spbpu_program(program)
             elif 'itmo.ru' in program.url:
                 parse_itmo_program(program)
+            elif 'mirea.ru' in program.url:      # <-- добавьте эту строку
+                parse_mirea_program(program)     # <-- и эту
             else:
                 parse_spbu_program(program)
         except Exception as e:
             print(f"❌ Ошибка при обработке {program.code}: {e}")
         time.sleep(2)
     print("✅ Обновление завершено.")
-
 
 # ------------------------------------------------------------
 # Тестовые функции (без изменений)
@@ -704,6 +870,106 @@ def test_itmo(code='2334'):
         print(f"❌ Ошибка: {e}")
         import traceback
         traceback.print_exc()
+        try:
+            print("\n📄 HTML страницы (первые 2000 символов):")
+            print(driver.page_source[:2000])
+        except:
+            pass
+    finally:
+        driver.quit()
+        print("\n✅ Тест завершён")
+
+def test_mirea(comp_id='1862638569831537974', edu_level='2', org_unit_id='1484028700495285107', edu_form_id='1'):
+
+    try:
+        subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'],
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL,
+                       check=False)
+    except:
+        pass
+
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-logging")
+    options.add_argument("--silent")
+    options.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/138.0.0.0 Safari/537.36"
+    )
+
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
+
+    try:
+        url = f"https://priem.mirea.ru/accepted-entrants-list/competition?comp_ids={comp_id}&edu_level={edu_level}&org_unit_id={org_unit_id}&edu_form_id={edu_form_id}"
+        print(f"⏳ Открываем страницу МИРЭА: {url}")
+        driver.get(url)
+        time.sleep(5)
+
+        wait = WebDriverWait(driver, 30)
+
+        # Пробуем дождаться появления любой таблицы или элемента с данными
+        try:
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table tbody tr")))
+            print("✅ Таблица найдена.")
+        except:
+            print("⚠️ Таблица с абитуриентами не найдена. Ищем любой элемент с '№'...")
+            wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '№')]")))
+
+        # Выводим текст страницы для анализа
+        page_text = driver.find_element(By.TAG_NAME, "body").text
+        print("\n📋 Первые 1500 символов страницы (для анализа):")
+        print(page_text[:1500])
+        print("\n" + "="*80 + "\n")
+
+        # Ищем таблицы
+        tables = driver.find_elements(By.TAG_NAME, "table")
+        if tables:
+            print(f"Найдено таблиц: {len(tables)}")
+            # Попробуем взять первую таблицу, которая содержит строки
+            for idx, table in enumerate(tables):
+                rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
+                if not rows:
+                    rows = table.find_elements(By.TAG_NAME, "tr")
+                if rows:
+                    print(f"Таблица #{idx+1}: {len(rows)} строк")
+                    # Выведем первые 10 строк
+                    for i, row in enumerate(rows[:10]):
+                        cols = row.find_elements(By.TAG_NAME, "td")
+                        if cols:
+                            data = [col.text.strip() for col in cols]
+                            print(f"  Строка {i+1}: {data}")
+                    break  # берём первую непустую таблицу
+        else:
+            print("⚠️ Таблиц не найдено. Пробуем извлечь данные через регулярные выражения...")
+
+        # Попробуем найти количество мест
+        match = re.search(r'Количество мест:\s*(\d+)', page_text)
+        if match:
+            print(f"\n📊 Количество бюджетных мест: {match.group(1)}")
+
+        # Можно также найти общее число абитуриентов
+        match_total = re.search(r'Всего:\s*(\d+)', page_text)
+        if match_total:
+            print(f"👥 Всего абитуриентов: {match_total.group(1)}")
+
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
+        # Если упало, выведем часть HTML для отладки
         try:
             print("\n📄 HTML страницы (первые 2000 символов):")
             print(driver.page_source[:2000])

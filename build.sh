@@ -11,6 +11,6 @@ echo "📦 Static"
 python project/manage.py collectstatic --noinput
 
 echo "📥 Add programs"
-python project/scripts/add_programs.py
+python project/scripts/add_program.py
 
 echo "✅ Build done"

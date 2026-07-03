@@ -1,11 +1,12 @@
 name: Update programs
-
 on:
-  schedule:
-    - cron: "0 * * * *"
   workflow_dispatch:
   repository_dispatch:
     types: [trigger-update]
+
+concurrency:
+  group: update-programs
+  cancel-in-progress: true
 
 jobs:
   update:
@@ -13,16 +14,12 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - uses: browser-actions/setup-chrome@v1
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-
       - name: Run update
         working-directory: .
         run: python -u project/manage.py update_programs

@@ -474,6 +474,10 @@ def parse_itmo_program(program_obj):
 # Парсер для МИРЭА
 # ------------------------------------------------------------
 
+# ------------------------------------------------------------
+# Парсер для МИРЭА (улучшенный)
+# ------------------------------------------------------------
+
 def parse_mirea_program(program_obj):
     kill_chromedrivers()
 
@@ -492,8 +496,10 @@ def parse_mirea_program(program_obj):
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/138.0.0.0 Safari/537.36"
+        "Chrome/114.0.0.0 Safari/537.36"
     )
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
 
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
@@ -502,16 +508,22 @@ def parse_mirea_program(program_obj):
 
     try:
         print(f"⏳ Парсинг МИРЭА: {program_obj.code} {program_obj.name}")
-        retry_on_connection_error(driver, program_obj.url)
+        retry_on_connection_error(driver, program_obj.url, retries=2, delay=10)
         time.sleep(5)
 
-        wait = WebDriverWait(driver, 30)
+        wait = WebDriverWait(driver, 60)  # увеличенный таймаут
 
-        # Ждём появления таблицы
-        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table tbody tr")))
-        print("✅ Таблица найдена.")
+        # Ждём появления любой таблицы
+        try:
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+        except TimeoutException:
+            page_text = driver.find_element(By.TAG_NAME, "body").text
+            print(f"⚠️ Таблица не найдена. Текст страницы (первые 500 символов):\n{page_text[:500]}")
+            driver.save_screenshot(f"mirea_error_{program_obj.code}.png")
+            print(f"📸 Скриншот сохранён как mirea_error_{program_obj.code}.png")
+            return
 
-        # Находим таблицу с данными (первую попавшуюся с данными)
+        # Ищем таблицу с данными
         tables = driver.find_elements(By.TAG_NAME, "table")
         target_table = None
         for table in tables:
@@ -519,51 +531,49 @@ def parse_mirea_program(program_obj):
             if rows:
                 target_table = table
                 break
-
         if not target_table:
-            print("⚠️ Таблица с данными не найдена")
+            # пробуем найти строки без tbody
+            for table in tables:
+                rows = table.find_elements(By.TAG_NAME, "tr")
+                if len(rows) > 1:
+                    target_table = table
+                    break
+        if not target_table:
+            print("⚠️ Не найдена таблица с данными")
+            page_text = driver.find_element(By.TAG_NAME, "body").text
+            print(f"Текст страницы (первые 500 символов):\n{page_text[:500]}")
             return
 
         rows = target_table.find_elements(By.CSS_SELECTOR, "tbody tr")
+        if not rows:
+            rows = target_table.find_elements(By.TAG_NAME, "tr")
+            if rows:
+                rows = rows[1:]  # пропускаем заголовок
+
         print(f"📋 Найдено строк: {len(rows)}")
 
         if not rows:
             print("⚠️ Таблица пуста")
             return
 
-        # Парсим строки
         common_scores = []
         applicants_data = []
 
         for row in rows:
             cols = row.find_elements(By.TAG_NAME, "td")
-            if len(cols) < 9:  # минимальное количество колонок, которое нам нужно
+            if len(cols) < 9:
                 continue
 
             try:
                 position = int(cols[0].text.strip()) if cols[0].text.strip() else None
                 code = cols[1].text.strip() if len(cols) > 1 else ''
+                # статус согласия (колонка 4)
+                has_consent = cols[4].text.strip().lower() == 'да' if len(cols) > 4 else None
 
-                # Статус определяется по колонкам:
-                # - колонка 4 (индекс 4) - "да" если есть согласие
-                # - колонка 7 (индекс 7) - три балла ЕГЭ через пробел
-                # - колонка 8 (индекс 8) - сумма баллов за ИД
-                # - колонка 9 (индекс 9) - баллы за индивидуальные достижения
-                # - колонка 10 (индекс 10) - общая сумма баллов
-
-                # Проверяем, есть ли отметка "да" в колонке согласия (индекс 4)
-                consent = cols[4].text.strip().lower() if len(cols) > 4 else ''
-
-                # Статус абитуриента
-                # По умолчанию считаем, что все участвуют в общем конкурсе
-                # Особые статусы определяем по дополнительным признакам
+                # статус – пока все как common, можно расширить при необходимости
                 status = 'common'
 
-                # Если есть отметка о целевом или особой квоте - нужно определить
-                # Пока оставляем как common, т.к. в таблице нет явных признаков
-                # Но можно добавить логику позже, если появятся данные
-
-                # Сумма баллов - обычно в колонке 10 (индекс 10)
+                # сумма баллов – обычно в 10-й колонке (индекс 10)
                 score_str = cols[10].text.strip().replace(',', '.') if len(cols) > 10 else '0'
                 try:
                     score = float(score_str) if score_str else 0.0
@@ -576,7 +586,6 @@ def parse_mirea_program(program_obj):
                     'score': score,
                     'status': status,
                 })
-
                 if status == 'common' and score > 0:
                     common_scores.append(score)
 
@@ -590,7 +599,6 @@ def parse_mirea_program(program_obj):
 
         stats = sync_applicants(program_obj, applicants_data)
 
-        # Вычисляем проходные баллы
         common_scores.sort(reverse=True)
         budget = program_obj.budget_places or 0
         if budget > 0 and common_scores:
@@ -606,8 +614,7 @@ def parse_mirea_program(program_obj):
             program_obj.avg_score_passed = None
         program_obj.save()
 
-        print(
-            f"✅ Обновлена программа {program_obj.code}: создано {stats['created']}, обновлено {stats['updated']}, удалено {stats['deleted']}")
+        print(f"✅ Обновлена программа {program_obj.code}: создано {stats['created']}, обновлено {stats['updated']}, удалено {stats['deleted']}")
 
     except Exception as e:
         print(f"❌ Ошибка при парсинге МИРЭА: {e}")
@@ -622,7 +629,7 @@ def parse_mirea_program(program_obj):
                 print("🧹 Временный профиль Chrome удалён")
         except Exception as e:
             print(f"⚠️ Не удалось удалить временный профиль: {e}")
-        kill_chromedrivers()
+
 
 
 # ------------------------------------------------------------
@@ -879,15 +886,15 @@ def test_itmo(code='2334'):
         driver.quit()
         print("\n✅ Тест завершён")
 
-def test_mirea(comp_id='1862638569831537974', edu_level='2', org_unit_id='1484028700495285107', edu_form_id='1'):
 
-    try:
-        subprocess.run(['taskkill', '/f', '/im', 'chromedriver.exe'],
-                       stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL,
-                       check=False)
-    except:
-        pass
+def test_mirea(comp_id='1862638569831537974', edu_level='2', org_unit_id='14840287700495285107', edu_form_id='1'):
+    """
+    Быстрый тест парсинга страницы МИРЭА.
+    Запускать из Django shell:
+        from parsers.services import test_mirea
+        test_mirea('1862532990899330358')
+    """
+    kill_chromedrivers()
 
     options = Options()
     options.add_argument("--headless=new")
@@ -904,8 +911,10 @@ def test_mirea(comp_id='1862638569831537974', edu_level='2', org_unit_id='148402
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/138.0.0.0 Safari/537.36"
+        "Chrome/114.0.0.0 Safari/537.36"
     )
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
 
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
@@ -918,15 +927,18 @@ def test_mirea(comp_id='1862638569831537974', edu_level='2', org_unit_id='148402
         driver.get(url)
         time.sleep(5)
 
-        wait = WebDriverWait(driver, 30)
+        wait = WebDriverWait(driver, 60)
 
-        # Пробуем дождаться появления любой таблицы или элемента с данными
+        # Пробуем дождаться таблицы
         try:
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table tbody tr")))
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
             print("✅ Таблица найдена.")
-        except:
-            print("⚠️ Таблица с абитуриентами не найдена. Ищем любой элемент с '№'...")
-            wait.until(EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '№')]")))
+        except TimeoutException:
+            page_text = driver.find_element(By.TAG_NAME, "body").text
+            print(f"⚠️ Таблица не найдена. Текст страницы (первые 500 символов):\n{page_text[:500]}")
+            driver.save_screenshot(f"test_mirea_error_{comp_id}.png")
+            print(f"📸 Скриншот сохранён как test_mirea_error_{comp_id}.png")
+            return
 
         # Выводим текст страницы для анализа
         page_text = driver.find_element(By.TAG_NAME, "body").text
@@ -936,40 +948,37 @@ def test_mirea(comp_id='1862638569831537974', edu_level='2', org_unit_id='148402
 
         # Ищем таблицы
         tables = driver.find_elements(By.TAG_NAME, "table")
-        if tables:
-            print(f"Найдено таблиц: {len(tables)}")
-            # Попробуем взять первую таблицу, которая содержит строки
-            for idx, table in enumerate(tables):
-                rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
-                if not rows:
-                    rows = table.find_elements(By.TAG_NAME, "tr")
-                if rows:
-                    print(f"Таблица #{idx+1}: {len(rows)} строк")
-                    # Выведем первые 10 строк
-                    for i, row in enumerate(rows[:10]):
-                        cols = row.find_elements(By.TAG_NAME, "td")
-                        if cols:
-                            data = [col.text.strip() for col in cols]
-                            print(f"  Строка {i+1}: {data}")
-                    break  # берём первую непустую таблицу
-        else:
-            print("⚠️ Таблиц не найдено. Пробуем извлечь данные через регулярные выражения...")
+        if not tables:
+            print("⚠️ Таблиц не найдено.")
+            return
 
-        # Попробуем найти количество мест
+        print(f"Найдено таблиц: {len(tables)}")
+        for idx, table in enumerate(tables):
+            rows = table.find_elements(By.CSS_SELECTOR, "tbody tr")
+            if not rows:
+                rows = table.find_elements(By.TAG_NAME, "tr")
+            if rows:
+                print(f"Таблица #{idx+1}: {len(rows)} строк")
+                # Выведем первые 10 строк
+                for i, row in enumerate(rows[:10]):
+                    cols = row.find_elements(By.TAG_NAME, "td")
+                    if cols:
+                        data = [col.text.strip() for col in cols]
+                        print(f"  Строка {i+1}: {data}")
+                break
+
+        # Количество мест
         match = re.search(r'Количество мест:\s*(\d+)', page_text)
         if match:
             print(f"\n📊 Количество бюджетных мест: {match.group(1)}")
 
-        # Можно также найти общее число абитуриентов
         match_total = re.search(r'Всего:\s*(\d+)', page_text)
         if match_total:
             print(f"👥 Всего абитуриентов: {match_total.group(1)}")
 
     except Exception as e:
         print(f"❌ Ошибка: {e}")
-        import traceback
         traceback.print_exc()
-        # Если упало, выведем часть HTML для отладки
         try:
             print("\n📄 HTML страницы (первые 2000 символов):")
             print(driver.page_source[:2000])
